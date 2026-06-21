@@ -8,15 +8,14 @@ warnings.filterwarnings("ignore")
 st.set_page_config(page_title="FOMO Stock Companion", page_icon="📈", layout="wide")
 
 st.markdown('<h1 style="color:#1f77b4">📈 FOMO Stock Companion</h1>', unsafe_allow_html=True)
+st.markdown("**Strong analysis. Clear decisions. Real risk awareness.**")
 
 # ==================== MODE SELECTORS ====================
-col1, col2 = st.columns(2)
-with col1:
-    data_mode = st.radio("Data Mode", ["Stock Mode", "Crypto Mode"], horizontal=True)
-with col2:
-    risk_mode = st.radio("Risk Style", ["Aggressive", "Cautious"], horizontal=True)
-
-st.caption(f"**{data_mode}** | **{risk_mode}** Mode")
+with st.sidebar:
+    st.header("Modes")
+    data_mode = st.radio("Data Mode", ["Stock Mode", "Crypto Mode"], index=1)
+    risk_mode = st.radio("Risk Style", ["Aggressive", "Cautious"], index=0)
+    st.caption(f"**{data_mode}** • **{risk_mode}**")
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -58,9 +57,9 @@ def calculate_signals(hist):
         "error": None
     }
 
-# ==================== QUICK ANALYSIS + ACTIONABLE COMPANION ====================
+# ==================== QUICK ANALYSIS + ACTIONABLE RECOMMENDATIONS ====================
 
-st.subheader("⚡ Quick Analysis + Actionable Suggestions")
+st.subheader("⚡ Quick Analysis + Decision Engine")
 
 ticker = st.text_input("Enter Ticker", value="USWR" if data_mode == "Crypto Mode" else "MU").upper().strip()
 
@@ -70,67 +69,3 @@ if ticker:
         if err or hist is None:
             st.error(err)
         else:
-            sig = calculate_signals(hist)
-            if sig.get("error"):
-                st.error(sig["error"])
-            else:
-                st.markdown(f"**{ticker}** — ${sig['current_price']} | {sig['pct_today']:+.2f}% today")
-
-                with st.expander("🧠 What Should You Do Right Now?", expanded=True):
-                    fomo = sig['fomo_score']
-                    trend = sig['trend_direction']
-
-                    if risk_mode == "Aggressive":
-                        if fomo >= 4 and trend == "Uptrend":
-                            st.success("**Buy / Add on dips** — Strong momentum. Good aggressive setup.")
-                        elif fomo >= 3:
-                            st.info("**Watch for entry** — Decent momentum. Can take small size.")
-                        else:
-                            st.warning("**Skip** — Weak signals. Not worth the risk in aggressive mode.")
-                    else:  # Cautious
-                        if fomo >= 5 and trend == "Uptrend":
-                            st.success("**Cautious Buy** — Strong setup with acceptable risk/reward.")
-                        elif fomo >= 3:
-                            st.info("**Wait** — Not strong enough yet. Better setups likely exist.")
-                        else:
-                            st.warning("**Avoid** — Weak momentum. Protect capital.")
-
-    else:  # Crypto Mode
-        st.warning("Crypto Mode: Data is limited. Focus is on risk management and momentum.")
-
-        with st.expander("🧠 What Should You Do Right Now? (Crypto)", expanded=True):
-            st.markdown(f"**Analyzing {ticker}**")
-
-            # Simple heuristic for crypto tokens
-            if ticker in ["USWR", "ZERO", "DAEMON", "TROLL"]:
-                st.info("This token has already had a very large move. These often pull back sharply after big green days.")
-
-            if risk_mode == "Aggressive":
-                st.success("**Aggressive Take:** If you're already in profit, consider taking partial profits (30-50%) and letting the rest run. Adding more here is high risk.")
-            else:
-                st.warning("**Cautious Take:** These moves are extended. Better to wait for a pullback or clearer structure before adding. Protect your capital.")
-
-# ==================== PORTFOLIO TRACKER ====================
-
-st.subheader("📊 Portfolio Tracker + Live Suggestions")
-
-if "positions" not in st.session_state:
-    st.session_state.positions = []
-
-with st.form("add_pos"):
-    t = st.text_input("Ticker")
-    bp = st.number_input("Buy Price", min_value=0.01)
-    sh = st.number_input("Shares / Amount", min_value=0.01)
-    if st.form_submit_button("Add / Update Position"):
-        st.session_state.positions.append({
-            "ticker": t.upper(),
-            "buy_price": bp,
-            "shares": sh,
-            "date": str(datetime.now().date())
-        })
-        st.rerun()
-
-for pos in st.session_state.positions:
-    st.write(f"**{pos['ticker']}** | Buy: ${pos['buy_price']} | Amount: {pos['shares']}")
-
-st.caption("Add your current positions above so the app can give better personalized suggestions.")
