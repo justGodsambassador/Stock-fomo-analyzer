@@ -147,4 +147,4 @@ for i, pos in enumerate(positions):
     buy_date = pos.get("buy_date")
 
     hist, info, err = get_ticker_data(ticker)
-    if err or hist
+    if err or hist is none:
