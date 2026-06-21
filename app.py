@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import numpy as np
 from datetime import datetime
 import warnings
 warnings.filterwarnings("ignore")
@@ -11,14 +10,14 @@ st.set_page_config(page_title="FOMO Stock Companion", page_icon="📈", layout="
 st.markdown('<h1 style="color:#1f77b4">📈 FOMO Stock Companion</h1>', unsafe_allow_html=True)
 
 # ==================== MODE SELECTOR ====================
-st.sidebar.header("Analysis Mode")
-mode = st.sidebar.radio(
-    "Choose your style:",
-    ["Aggressive", "Cautious"],
-    index=0,
-    help="Aggressive = Higher risk, chase bigger moves. Cautious = Protect capital, better risk/reward."
+mode = st.radio(
+    "Select Mode:",
+    ["Stock Mode", "Crypto Mode"],
+    horizontal=True,
+    help="Stock Mode = Traditional stocks. Crypto Mode = Meme coins & low-cap tokens (like TROLL, ZERO, Daemon)"
 )
-st.sidebar.caption(f"**Current Mode:** {mode}")
+
+st.caption(f"**Current Mode:** {mode}")
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -27,81 +26,81 @@ def get_ticker_data(symbol, period="3mo"):
         ticker = yf.Ticker(symbol.upper().strip())
         hist = ticker.history(period=period, auto_adjust=True)
         info = ticker.info
-        if hist is None or len(hist) < 20:
-            return None, None, "Not enough price history"
+        if hist is None or len(hist) < 15:
+            return None, None, "Not enough data"
         return hist, info, None
     except Exception as e:
         return None, None, str(e)
 
-def calculate_momentum_signals(hist, info):
-    if hist is None or len(hist) < 30:
+def calculate_basic_signals(hist):
+    if hist is None or len(hist) < 20:
         return {"error": "Not enough data"}
 
-    try:
-        close = hist['Close']
-        current_price = close.iloc[-1]
-        pct_today = ((current_price / close.iloc[-2]) - 1) * 100 if len(close) > 1 else 0
-        vol_ratio = hist['Volume'].iloc[-1] / hist['Volume'].rolling(20).mean().iloc[-1]
+    close = hist['Close']
+    current_price = close.iloc[-1]
+    pct_today = ((current_price / close.iloc[-2]) - 1) * 100 if len(close) > 1 else 0
+    vol_ratio = hist['Volume'].iloc[-1] / hist['Volume'].rolling(20).mean().iloc[-1]
 
-        sma20 = close.rolling(20).mean().iloc[-1]
-        trend = "Uptrend" if current_price > sma20 else "Downtrend"
+    sma20 = close.rolling(20).mean().iloc[-1]
+    trend = "Uptrend" if current_price > sma20 else "Downtrend"
 
-        fomo_score = 0
-        if vol_ratio > 1.5 and pct_today > 2:
-            fomo_score += 2
-        if current_price > sma20:
-            fomo_score += 1
+    fomo_score = 0
+    if vol_ratio > 1.5 and pct_today > 2:
+        fomo_score += 2
+    if current_price > sma20:
+        fomo_score += 1
 
-        return {
-            "current_price": round(current_price, 2),
-            "pct_today": round(pct_today, 2),
-            "vol_ratio": round(vol_ratio, 2),
-            "fomo_score": fomo_score,
-            "trend_direction": trend,
-            "error": None
-        }
-    except Exception as e:
-        return {"error": str(e)}
+    return {
+        "current_price": round(current_price, 2),
+        "pct_today": round(pct_today, 2),
+        "vol_ratio": round(vol_ratio, 2),
+        "fomo_score": fomo_score,
+        "trend_direction": trend,
+        "error": None
+    }
 
-# ==================== QUICK BUY/SELL + COMPANION (MODE AWARE) ====================
+# ==================== QUICK ANALYSIS (MODE AWARE) ====================
 
-st.subheader("⚡ Quick Buy/Sell + In-Site Companion")
+st.subheader("⚡ Quick Analysis + Companion")
 
-quick_ticker = st.text_input("Enter Ticker", value="MU").upper().strip()
+ticker = st.text_input("Enter Ticker", value="MU" if mode == "Stock Mode" else "ZERO").upper().strip()
 
-if quick_ticker:
-    hist, info, err = get_ticker_data(quick_ticker)
-    if err or hist is None:
-        st.error(f"Could not load data for '{quick_ticker}'")
-    else:
-        sig = calculate_momentum_signals(hist, info or {})
-        if sig.get("error"):
-            st.error(sig["error"])
+if ticker:
+    if mode == "Stock Mode":
+        hist, info, err = get_ticker_data(ticker)
+        if err or hist is None:
+            st.error(err)
         else:
-            price = sig["current_price"]
-            st.markdown(f"**{quick_ticker}** — ${price}")
-            st.markdown(f"**Trend:** {sig['trend_direction']} | **FOMO Score:** {sig['fomo_score']}")
+            sig = calculate_basic_signals(hist)
+            if sig.get("error"):
+                st.error(sig["error"])
+            else:
+                st.markdown(f"**{ticker}** — ${sig['current_price']}")
+                st.markdown(f"**Trend:** {sig['trend_direction']} | **FOMO Score:** {sig['fomo_score']}")
 
-            # Mode-aware advice
-            with st.expander("🧠 Companion Advice", expanded=True):
-                fomo = sig['fomo_score']
-                trend = sig['trend_direction']
-
-                if mode == "Aggressive":
-                    if fomo >= 4 and trend == "Uptrend":
-                        st.success("**Aggressive Buy** — Strong momentum. Good for higher risk/reward plays.")
-                    elif fomo >= 3:
-                        st.info("**Aggressive Watch** — Decent setup. Can take small size.")
+                with st.expander("🧠 Companion Advice", expanded=True):
+                    if sig['fomo_score'] >= 4 and sig['trend_direction'] == "Uptrend":
+                        st.success("**Good momentum** — Solid setup for entry on dips.")
+                    elif sig['fomo_score'] >= 2:
+                        st.info("**Moderate setup** — Wait for clearer confirmation.")
                     else:
-                        st.warning("**Skip or Small Size** — Weak signals. Not ideal for aggressive style.")
+                        st.warning("**Weak signals** — Better opportunities likely exist.")
 
-                else:  # Cautious mode
-                    if fomo >= 5 and trend == "Uptrend":
-                        st.success("**Cautious Buy** — Strong setup with decent risk/reward.")
-                    elif fomo >= 3:
-                        st.info("**Wait for Better Setup** — Not strong enough for cautious style.")
-                    else:
-                        st.warning("**Avoid** — Weak momentum. Better opportunities exist.")
+    else:  # Crypto Mode
+        st.warning("⚠️ Crypto Mode is limited. Data for low-cap tokens is less reliable.")
+        st.markdown(f"**Analyzing {ticker} in Crypto Mode**")
+
+        with st.expander("🧠 Companion Advice (Crypto)", expanded=True):
+            st.markdown("""
+            **General Guidance for tokens like this:**
+            - These tokens are extremely volatile.
+            - Big green days (+100%+) are often followed by sharp pullbacks.
+            - **Risk Management Rule**: Never risk more than you can afford to lose completely.
+            - Consider taking partial profits after big runs (e.g. sell 30-50% when up 2x+).
+            """)
+
+            if ticker in ["ZERO", "TROLL", "DAEMON", "GLIPPY"]:
+                st.info("This looks like a high-risk meme coin. Strong moves can reverse very quickly.")
 
 # ==================== MULTI-ACCOUNT PORTFOLIO TRACKER ====================
 
@@ -116,7 +115,7 @@ positions = st.session_state.fomo_accounts[account]
 for pos in positions:
     st.write(f"**{pos['ticker']}** | Buy: ${pos['buy_price']} | Shares: {pos['shares']}")
 
-with st.form("add_pos"):
+with st.form("add_position"):
     t = st.text_input("Ticker")
     bp = st.number_input("Buy Price", min_value=0.01)
     sh = st.number_input("Shares", min_value=0.01)
@@ -129,23 +128,4 @@ with st.form("add_pos"):
         })
         st.rerun()
 
-# ==================== AUTO FOMO SCANNER ====================
-
-st.subheader("🚀 Auto FOMO Scanner")
-
-base_watchlist = ["MU", "NVDA", "PLTR", "AMD", "AVGO", "BFLY", "SOFI"]
-data = []
-for t in base_watchlist:
-    h, inf, e = get_ticker_data(t, "2mo")
-    if e or h is None: continue
-    s = calculate_momentum_signals(h, inf or {})
-    if s.get("error"): continue
-    data.append({
-        "Ticker": t,
-        "Price": s["current_price"],
-        "FOMO Score": s["fomo_score"],
-        "Trend": s["trend_direction"]
-    })
-
-if data:
-    st.dataframe(pd.DataFrame(data).sort_values("FOMO Score", ascending=False), use_container_width=True)
+st.caption("Note: Crypto Mode gives more general advice. Stock Mode uses full technical analysis.")
