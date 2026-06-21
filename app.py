@@ -148,6 +148,6 @@ for i, pos in enumerate(positions):
 
     hist, info, err = get_ticker_data(ticker)
     if err or hist is none:
-    st.error(f"Could not load data for '{ticker_input}'. Try a valid ticker.")
-else:
-    sig = calculate_momentum_signals(hist, info or {})
+        st.error(f"Could not load data for '{ticker_input}'. Try a valid ticker.")
+    else:
+        sig = calculate_momentum_signals(hist, info or {})
