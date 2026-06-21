@@ -9,15 +9,14 @@ st.set_page_config(page_title="FOMO Stock Companion", page_icon="📈", layout="
 
 st.markdown('<h1 style="color:#1f77b4">📈 FOMO Stock Companion</h1>', unsafe_allow_html=True)
 
-# ==================== MODE SELECTOR ====================
-mode = st.radio(
-    "Select Mode:",
-    ["Stock Mode", "Crypto Mode"],
-    horizontal=True,
-    help="Stock Mode = Traditional stocks. Crypto Mode = Meme coins & low-cap tokens (like TROLL, ZERO, Daemon)"
-)
+# ==================== MODE SELECTORS ====================
+col1, col2 = st.columns(2)
+with col1:
+    data_mode = st.radio("Data Mode", ["Stock Mode", "Crypto Mode"], horizontal=True)
+with col2:
+    risk_mode = st.radio("Risk Style", ["Aggressive", "Cautious"], horizontal=True)
 
-st.caption(f"**Current Mode:** {mode}")
+st.caption(f"**{data_mode}** | **{risk_mode}** Mode")
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -32,7 +31,7 @@ def get_ticker_data(symbol, period="3mo"):
     except Exception as e:
         return None, None, str(e)
 
-def calculate_basic_signals(hist):
+def calculate_signals(hist):
     if hist is None or len(hist) < 20:
         return {"error": "Not enough data"}
 
@@ -59,73 +58,79 @@ def calculate_basic_signals(hist):
         "error": None
     }
 
-# ==================== QUICK ANALYSIS (MODE AWARE) ====================
+# ==================== QUICK ANALYSIS + ACTIONABLE COMPANION ====================
 
-st.subheader("⚡ Quick Analysis + Companion")
+st.subheader("⚡ Quick Analysis + Actionable Suggestions")
 
-ticker = st.text_input("Enter Ticker", value="MU" if mode == "Stock Mode" else "ZERO").upper().strip()
+ticker = st.text_input("Enter Ticker", value="USWR" if data_mode == "Crypto Mode" else "MU").upper().strip()
 
 if ticker:
-    if mode == "Stock Mode":
+    if data_mode == "Stock Mode":
         hist, info, err = get_ticker_data(ticker)
         if err or hist is None:
             st.error(err)
         else:
-            sig = calculate_basic_signals(hist)
+            sig = calculate_signals(hist)
             if sig.get("error"):
                 st.error(sig["error"])
             else:
-                st.markdown(f"**{ticker}** — ${sig['current_price']}")
-                st.markdown(f"**Trend:** {sig['trend_direction']} | **FOMO Score:** {sig['fomo_score']}")
+                st.markdown(f"**{ticker}** — ${sig['current_price']} | {sig['pct_today']:+.2f}% today")
 
-                with st.expander("🧠 Companion Advice", expanded=True):
-                    if sig['fomo_score'] >= 4 and sig['trend_direction'] == "Uptrend":
-                        st.success("**Good momentum** — Solid setup for entry on dips.")
-                    elif sig['fomo_score'] >= 2:
-                        st.info("**Moderate setup** — Wait for clearer confirmation.")
-                    else:
-                        st.warning("**Weak signals** — Better opportunities likely exist.")
+                with st.expander("🧠 What Should You Do Right Now?", expanded=True):
+                    fomo = sig['fomo_score']
+                    trend = sig['trend_direction']
+
+                    if risk_mode == "Aggressive":
+                        if fomo >= 4 and trend == "Uptrend":
+                            st.success("**Buy / Add on dips** — Strong momentum. Good aggressive setup.")
+                        elif fomo >= 3:
+                            st.info("**Watch for entry** — Decent momentum. Can take small size.")
+                        else:
+                            st.warning("**Skip** — Weak signals. Not worth the risk in aggressive mode.")
+                    else:  # Cautious
+                        if fomo >= 5 and trend == "Uptrend":
+                            st.success("**Cautious Buy** — Strong setup with acceptable risk/reward.")
+                        elif fomo >= 3:
+                            st.info("**Wait** — Not strong enough yet. Better setups likely exist.")
+                        else:
+                            st.warning("**Avoid** — Weak momentum. Protect capital.")
 
     else:  # Crypto Mode
-        st.warning("⚠️ Crypto Mode is limited. Data for low-cap tokens is less reliable.")
-        st.markdown(f"**Analyzing {ticker} in Crypto Mode**")
+        st.warning("Crypto Mode: Data is limited. Focus is on risk management and momentum.")
 
-        with st.expander("🧠 Companion Advice (Crypto)", expanded=True):
-            st.markdown("""
-            **General Guidance for tokens like this:**
-            - These tokens are extremely volatile.
-            - Big green days (+100%+) are often followed by sharp pullbacks.
-            - **Risk Management Rule**: Never risk more than you can afford to lose completely.
-            - Consider taking partial profits after big runs (e.g. sell 30-50% when up 2x+).
-            """)
+        with st.expander("🧠 What Should You Do Right Now? (Crypto)", expanded=True):
+            st.markdown(f"**Analyzing {ticker}**")
 
-            if ticker in ["ZERO", "TROLL", "DAEMON", "GLIPPY"]:
-                st.info("This looks like a high-risk meme coin. Strong moves can reverse very quickly.")
+            # Simple heuristic for crypto tokens
+            if ticker in ["USWR", "ZERO", "DAEMON", "TROLL"]:
+                st.info("This token has already had a very large move. These often pull back sharply after big green days.")
 
-# ==================== MULTI-ACCOUNT PORTFOLIO TRACKER ====================
+            if risk_mode == "Aggressive":
+                st.success("**Aggressive Take:** If you're already in profit, consider taking partial profits (30-50%) and letting the rest run. Adding more here is high risk.")
+            else:
+                st.warning("**Cautious Take:** These moves are extended. Better to wait for a pullback or clearer structure before adding. Protect your capital.")
 
-st.subheader("📊 Multi-Account FOMO Portfolio Tracker")
+# ==================== PORTFOLIO TRACKER ====================
 
-if "fomo_accounts" not in st.session_state:
-    st.session_state.fomo_accounts = {"Main Account": []}
+st.subheader("📊 Portfolio Tracker + Live Suggestions")
 
-account = st.selectbox("Select Account", list(st.session_state.fomo_accounts.keys()))
-positions = st.session_state.fomo_accounts[account]
+if "positions" not in st.session_state:
+    st.session_state.positions = []
 
-for pos in positions:
-    st.write(f"**{pos['ticker']}** | Buy: ${pos['buy_price']} | Shares: {pos['shares']}")
-
-with st.form("add_position"):
+with st.form("add_pos"):
     t = st.text_input("Ticker")
     bp = st.number_input("Buy Price", min_value=0.01)
-    sh = st.number_input("Shares", min_value=0.01)
-    if st.form_submit_button("Add Position"):
-        st.session_state.fomo_accounts[account].append({
+    sh = st.number_input("Shares / Amount", min_value=0.01)
+    if st.form_submit_button("Add / Update Position"):
+        st.session_state.positions.append({
             "ticker": t.upper(),
             "buy_price": bp,
             "shares": sh,
-            "buy_date": str(datetime.now().date())
+            "date": str(datetime.now().date())
         })
         st.rerun()
 
-st.caption("Note: Crypto Mode gives more general advice. Stock Mode uses full technical analysis.")
+for pos in st.session_state.positions:
+    st.write(f"**{pos['ticker']}** | Buy: ${pos['buy_price']} | Amount: {pos['shares']}")
+
+st.caption("Add your current positions above so the app can give better personalized suggestions.")
