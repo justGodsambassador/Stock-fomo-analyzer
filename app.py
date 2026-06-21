@@ -38,5 +38,9 @@ def calculate_momentum_signals(hist, info):
         sma50 = close.rolling(50).mean().iloc[-1] if len(close) >= 50 else sma20
 
         # RSI
-        delta = close.diff()
-        gain = delta.where(delta > 0
+        # RSI
+delta = close.diff()
+gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+rs = gain / loss
+rsi = 100 - (100 / (1 + rs)).iloc[-1]
